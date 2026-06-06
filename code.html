@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Weather Dashboard</title>
+
+<style>
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    font-family:Arial, sans-serif;
+    min-height:100vh;
+    background:linear-gradient(135deg,#3b82f6,#9333ea);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    padding:20px;
+}
+
+.container{
+    width:100%;
+    max-width:600px;
+    background:white;
+    border-radius:16px;
+    padding:25px;
+    box-shadow:0 10px 25px rgba(0,0,0,.2);
+}
+
+h1{
+    text-align:center;
+    margin-bottom:20px;
+    color:#1e293b;
+}
+
+.search-box{
+    display:flex;
+    gap:10px;
+    margin-bottom:20px;
+}
+
+input{
+    flex:1;
+    padding:12px;
+    border:1px solid #ccc;
+    border-radius:8px;
+    font-size:16px;
+}
+
+button{
+    padding:12px 20px;
+    border:none;
+    background:#2563eb;
+    color:white;
+    border-radius:8px;
+    cursor:pointer;
+}
+
+button:hover{
+    background:#1d4ed8;
+}
+
+.weather-card{
+    display:none;
+    margin-top:20px;
+}
+
+.city{
+    text-align:center;
+    margin-bottom:20px;
+}
+
+.grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+    gap:15px;
+}
+
+.metric{
+    background:#f8fafc;
+    padding:20px;
+    border-radius:12px;
+    text-align:center;
+}
+
+.metric h3{
+    color:#475569;
+    margin-bottom:10px;
+}
+
+.metric p{
+    font-size:24px;
+    font-weight:bold;
+}
+
+.error{
+    color:red;
+    text-align:center;
+    margin-top:15px;
+}
+
+.loading{
+    text-align:center;
+    margin-top:15px;
+    color:#2563eb;
+}
+
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>Weather Dashboard</h1>
+
+    <div class="search-box">
+        <input
+            type="text"
+            id="cityInput"
+            placeholder="Enter city name..."
+        >
+
+        <button id="searchBtn">
+            Search
+        </button>
+    </div>
+
+    <div id="loading" class="loading"></div>
+
+    <div id="error" class="error"></div>
+
+    <div id="weatherCard" class="weather-card">
+
+        <div class="city">
+            <h2 id="cityName"></h2>
+        </div>
+
+        <div class="grid">
+
+            <div class="metric">
+                <h3>Temperature</h3>
+                <p id="temp">--</p>
+            </div>
+
+            <div class="metric">
+                <h3>Humidity</h3>
+                <p id="humidity">--</p>
+            </div>
+
+            <div class="metric">
+                <h3>Wind Speed</h3>
+                <p id="wind">--</p>
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+const cityInput =
+    document.getElementById("cityInput");
+
+const searchBtn =
+    document.getElementById("searchBtn");
+
+const weatherCard =
+    document.getElementById("weatherCard");
+
+const cityName =
+    document.getElementById("cityName");
+
+const temp =
+    document.getElementById("temp");
+
+const humidity =
+    document.getElementById("humidity");
+
+const wind =
+    document.getElementById("wind");
+
+const errorDiv =
+    document.getElementById("error");
+
+const loadingDiv =
+    document.getElementById("loading");
+
+/*
+====================================
+FETCH WEATHER
+====================================
+*/
+
+async function getWeather(city){
+
+    try{
+
+        errorDiv.textContent = "";
+        loadingDiv.textContent = "Loading...";
+        weatherCard.style.display = "none";
+
+        /*
+        STEP 1:
+        GET LATITUDE & LONGITUDE
+        */
+
+        const geoResponse =
+            await fetch(
+                `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1`
+            );
+
+        if(!geoResponse.ok){
+            throw new Error(
+                "Failed to fetch location."
+            );
+        }
+
+        const geoData =
+            await geoResponse.json();
+
+        if(
+            !geoData.results ||
+            geoData.results.length === 0
+        ){
+            throw new Error(
+                "City not found."
+            );
+        }
+
+        /*
+        PARSE NESTED JSON
+        */
+
+        const location =
+            geoData.results[0];
+
+        const latitude =
+            location.latitude;
+
+        const longitude =
+            location.longitude;
+
+        /*
+        STEP 2:
+        GET WEATHER DATA
+        */
+
+        const weatherResponse =
+            await fetch(
+                `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,wind_speed_10m`
+            );
+
+        if(!weatherResponse.ok){
+            throw new Error(
+                "Weather service unavailable."
+            );
+        }
+
+        const weatherData =
+            await weatherResponse.json();
+
+        /*
+        NESTED JSON OBJECTS
+        */
+
+        const current =
+            weatherData.current;
+
+        cityName.textContent =
+            `${location.name}, ${location.country}`;
+
+        temp.textContent =
+            `${current.temperature_2m} °C`;
+
+        humidity.textContent =
+            `${current.relative_humidity_2m}%`;
+
+        wind.textContent =
+            `${current.wind_speed_10m} km/h`;
+
+        weatherCard.style.display = "block";
+
+    }
+    catch(error){
+
+        errorDiv.textContent =
+            error.message;
+
+        weatherCard.style.display = "none";
+    }
+    finally{
+
+        loadingDiv.textContent = "";
+    }
+}
+
+/*
+====================================
+EVENTS
+====================================
+*/
+
+searchBtn.addEventListener(
+    "click",
+    () => {
+
+        const city =
+            cityInput.value.trim();
+
+        if(city){
+            getWeather(city);
+        }
+    }
+);
+
+cityInput.addEventListener(
+    "keypress",
+    e => {
+
+        if(e.key === "Enter"){
+
+            const city =
+                cityInput.value.trim();
+
+            if(city){
+                getWeather(city);
+            }
+        }
+    }
+);
+
+/*
+====================================
+DEFAULT CITY
+====================================
+*/
+
+getWeather("Mumbai");
+
+</script>
+
+</body>
+</html>
